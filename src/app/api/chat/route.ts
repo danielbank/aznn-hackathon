@@ -1,60 +1,69 @@
-import { createAzure } from '@ai-sdk/azure';
-import { convertToCoreMessages, streamText } from "ai";
 import { env } from "@/lib/env";
 
 const {
   AZURE_OPENAI_API_KEY,
   AZURE_OPENAI_API_INSTANCE_NAME,
-  AZURE_OPENAI_DEPLOYMENT_NAME,
+  ASSISTANT_ID,
+  ML_ENDPOINT,
+  ML_ENDPOINT_API_KEY,
 } = env;
 
-// Log configuration (remove in production)
-console.log('Azure Configuration:', {
-  instanceName: AZURE_OPENAI_API_INSTANCE_NAME,
-  deploymentName: AZURE_OPENAI_DEPLOYMENT_NAME,
-  hasApiKey: !!AZURE_OPENAI_API_KEY,
-});
-
-// Initialize Azure OpenAI Service Provider Instance
-const azure = createAzure({
-  resourceName: AZURE_OPENAI_API_INSTANCE_NAME,
-  apiKey: AZURE_OPENAI_API_KEY,
-  apiVersion: "2024-04-01-preview" 
-});
+const API_VERSION = "2024-05-01-preview";
 
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json();
+    const body = await req.json();
+    console.log('Received request body:', body);
     
-    console.log('Received messages:', messages);
+    // Handle different message formats
+    const message = body.message || body.messages?.[0]?.content || body.content;
+    const threadId = body.threadId;
     
-    const result = await streamText({
-      model: azure(AZURE_OPENAI_DEPLOYMENT_NAME),
-      messages: convertToCoreMessages(messages),
-      system: `You are a duck, you can only quack at the user`,
-      temperature: 0.7,
-      maxTokens: 500,
+    if (!message) {
+      throw new Error('No message content provided');
+    }
+    
+    console.log('Sending to ML endpoint:', ML_ENDPOINT);
+
+    // Send request to ML endpoint
+    const response = await fetch(ML_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ML_ENDPOINT_API_KEY}`,
+      },
+      body: JSON.stringify({
+        chat_history: [],
+        question: message,
+        thread_id: threadId,
+        assistant_id: ASSISTANT_ID
+      })
     });
 
-    console.log('Stream created successfully');
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`ML endpoint error! status: ${response.status}, details: ${errorText}`);
+    }
 
-    const response = result.toDataStreamResponse();
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+    // Create a TransformStream to handle the response
+    const { readable, writable } = new TransformStream();
     
-    // Ensure proper CORS headers
-    const headers = new Headers(response.headers);
-    headers.set('Access-Control-Allow-Origin', '*');
-    headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    headers.set('Access-Control-Allow-Headers', 'Content-Type');
-    
-    return new Response(response.body, {
-      status: response.status,
-      headers,
+    // Pipe the response through the transform stream
+    response.body?.pipeTo(writable);
+
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      }
     });
   } catch (error: unknown) {
-    // Enhanced error logging
     console.error('Error details:', {
       name: error instanceof Error ? error.name : 'Unknown',
       message: error instanceof Error ? error.message : String(error),
