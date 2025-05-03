@@ -71,15 +71,16 @@ export async function POST(req: Request) {
     const stream = new ReadableStream({
       start(controller) {
         const encoder = new TextEncoder();
-        // Send the raw text content
+        // Send just the text content without any JSON formatting
         controller.enqueue(encoder.encode(jsonResponse.answer));
         controller.close();
       },
     });
 
+    // Return a plain text response
     return new Response(stream, {
       headers: {
-        'Content-Type': 'text/plain',
+        'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
       }
