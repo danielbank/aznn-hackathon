@@ -1,14 +1,9 @@
 import { env } from "@/lib/env";
 
 const {
-  AZURE_OPENAI_API_KEY,
-  AZURE_OPENAI_API_INSTANCE_NAME,
-  ASSISTANT_ID,
-  ML_ENDPOINT,
-  ML_ENDPOINT_API_KEY,
+  DUNGEON_MASTER_ML_ENDPOINT,
+  DUNGEON_MASTER_ML_ENDPOINT_API_KEY,
 } = env;
-
-const API_VERSION = "2024-05-01-preview";
 
 export const maxDuration = 30;
 
@@ -26,27 +21,25 @@ export async function POST(req: Request) {
       throw new Error('No message content provided');
     }
     
-    console.log('Sending to ML endpoint:', ML_ENDPOINT);
+    console.log('Sending to ML endpoint:', DUNGEON_MASTER_ML_ENDPOINT);
     console.log('Request payload:', {
       chat_history: [],
       question: message,
       thread_id: threadId,
-      assistant_id: ASSISTANT_ID
     });
 
     // Send request to ML endpoint
     console.log('Initiating fetch to ML endpoint...');
-    const response = await fetch(ML_ENDPOINT, {
+    const response = await fetch(DUNGEON_MASTER_ML_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ML_ENDPOINT_API_KEY}`,
+        'Authorization': `Bearer ${DUNGEON_MASTER_ML_ENDPOINT_API_KEY}`,
       },
       body: JSON.stringify({
         chat_history: [],
         question: message,
         thread_id: threadId,
-        assistant_id: ASSISTANT_ID
       })
     });
     console.log('Received response from ML endpoint, status:', response.status);
