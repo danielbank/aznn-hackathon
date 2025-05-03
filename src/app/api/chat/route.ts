@@ -14,6 +14,7 @@ export const maxDuration = 30;
 
 export async function POST(req: Request) {
   try {
+    console.log('Starting POST request handling');
     const body = await req.json();
     console.log('Received request body:', body);
     
@@ -26,8 +27,15 @@ export async function POST(req: Request) {
     }
     
     console.log('Sending to ML endpoint:', ML_ENDPOINT);
+    console.log('Request payload:', {
+      chat_history: [],
+      question: message,
+      thread_id: threadId,
+      assistant_id: ASSISTANT_ID
+    });
 
     // Send request to ML endpoint
+    console.log('Initiating fetch to ML endpoint...');
     const response = await fetch(ML_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -41,26 +49,39 @@ export async function POST(req: Request) {
         assistant_id: ASSISTANT_ID
       })
     });
+    console.log('Received response from ML endpoint, status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('ML endpoint error response:', errorText);
       throw new Error(`ML endpoint error! status: ${response.status}, details: ${errorText}`);
     }
 
-    // Create a TransformStream to handle the response
-    const { readable, writable } = new TransformStream();
+    // Get the JSON response
+    console.log('Parsing JSON response...');
+    const jsonResponse = await response.json();
+    console.log('Parsed JSON response:', jsonResponse);
     
-    // Pipe the response through the transform stream
-    response.body?.pipeTo(writable);
+    // Validate response structure
+    if (!jsonResponse || typeof jsonResponse.answer !== 'string') {
+      throw new Error('Invalid response format from ML endpoint');
+    }
 
-    return new Response(readable, {
+    // Create a stream from the response text
+    const stream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        // Send the raw text content
+        controller.enqueue(encoder.encode(jsonResponse.answer));
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
       headers: {
-        'Content-Type': 'text/event-stream',
+        'Content-Type': 'text/plain',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
       }
     });
   } catch (error: unknown) {

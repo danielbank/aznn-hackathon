@@ -1,11 +1,11 @@
 "use client";
 
-import { useAssistant } from "ai/react";
+import { useChat, Message } from "ai/react";
 
 export default function ChatPage() {
-  const { messages, input, handleInputChange, submitMessage, error } = useAssistant({
+  const { messages, input, handleInputChange, handleSubmit, error, isLoading } = useChat({
     api: "/api/chat",
-    threadId: undefined, // This will create a new thread
+    streamProtocol: 'text',
     onError: (error) => {
       console.error('Chat error:', error);
     },
@@ -19,7 +19,7 @@ export default function ChatPage() {
         </div>
       )}
       <div className="flex flex-col space-y-4">
-        {messages.map((message) => (
+        {messages.map((message: Message) => (
           <div
             key={message.id}
             className={`p-4 rounded-lg ${
@@ -27,21 +27,23 @@ export default function ChatPage() {
             }`}
           >
             <p className="font-semibold">{message.role === 'user' ? 'You' : 'Assistant'}</p>
-            <p>{message.content}</p>
+            <p className="whitespace-pre-wrap">{message.content}</p>
           </div>
         ))}
-        <form onSubmit={submitMessage} className="flex space-x-4">
+        <form onSubmit={handleSubmit} className="flex space-x-4">
           <input
             value={input}
             onChange={handleInputChange}
             placeholder="Type your message..."
             className="flex-1 p-2 border rounded"
+            disabled={isLoading}
           />
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+            disabled={isLoading}
           >
-            Send
+            {isLoading ? 'Sending...' : 'Send'}
           </button>
         </form>
       </div>
