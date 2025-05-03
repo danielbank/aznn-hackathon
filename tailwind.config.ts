@@ -10,6 +10,9 @@ export default {
   ],
   theme: {
   	extend: {
+  		fontFamily: {
+  			medieval: ['var(--font-medieval)'],
+  		},
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
